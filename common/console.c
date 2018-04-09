@@ -12,7 +12,6 @@
 #include "console.h"
 #include "app_dct.h"
 #include "util.h"
-#include "sysloop.h"
 #include "device.h"
 
 int cmd_get_dct(int argc, char* argv[])
