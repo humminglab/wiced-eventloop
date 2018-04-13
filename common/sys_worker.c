@@ -22,7 +22,9 @@ static void timer_callback(void *arg)
 {
 	sys_worker_t *s = arg;
 	a_eventloop_deregister_timer(s->evt, &s->timer_node);
-	wiced_rtos_send_asynchronous_event(&s->worker_thread, sensor_process, s);
+	if (wiced_rtos_send_asynchronous_event(s->worker_thread, sensor_process, s) != WICED_SUCCESS) {
+		a_eventloop_register_timer(s->evt, &s->timer_node, timer_callback, s->interval_ms, s);
+	}
 }
 
 static void event_callback(void *arg)
@@ -40,10 +42,12 @@ wiced_result_t a_sys_worker_trigger(sys_worker_t *s)
 	return WICED_SUCCESS;
 }
 
-wiced_result_t a_sys_worker_init(sys_worker_t *s, eventloop_t *e, uint32_t event_flag, int interval_ms,
+wiced_result_t a_sys_worker_init(sys_worker_t *s, wiced_worker_thread_t* worker_thread,
+				 eventloop_t *e, uint32_t event_flag, int interval_ms,
 				 sys_worker_fn worker_fn, sys_worker_fn finish_fn, void *arg)
 {
 	memset(s, 0, sizeof(*s));
+	s->worker_thread = worker_thread;
 	s->evt = e;
 	s->event_flag = event_flag;
 	s->interval_ms = interval_ms;
@@ -53,7 +57,6 @@ wiced_result_t a_sys_worker_init(sys_worker_t *s, eventloop_t *e, uint32_t event
 
 	a_eventloop_register_timer(s->evt, &s->timer_node, timer_callback, s->interval_ms, s);
 	a_eventloop_register_event(s->evt, &s->event_node, event_callback, s->event_flag, s);
-	wiced_rtos_create_worker_thread(&s->worker_thread, WICED_DEFAULT_WORKER_PRIORITY, 1024, 2);
 	
 	return WICED_SUCCESS;
 }
