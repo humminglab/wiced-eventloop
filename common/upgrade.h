@@ -23,6 +23,6 @@ typedef enum {
 	OTA_FAIL_MD5_VALIDATION_WRITING,
 } ota_result_t;
 
-ota_result_t a_upgrade_try(wiced_bool_t no_reboot);
-ota_result_t a_upgrade_from_shell(const char *host, uint16_t port);
+ota_result_t a_upgrade_try(wiced_bool_t use_tls, const char *host, uint16_t port,
+			   const char *path, const char *md5_hex, wiced_bool_t no_reboot);
 

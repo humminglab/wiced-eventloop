@@ -9,25 +9,13 @@
 
 #include "app_dct.h"
 #include "upgrade.h"
+#include "network.h"
 
 #include "http_stream.h"
 #include "base64.h"
 #include "wiced_security.h"
 #include "wiced_tls.h"
 #include "waf_platform.h"
-
-#include <ctype.h>
-
-#define UG_USE_HTTPS	WICED_TRUE
-#define UG_PORT		443
-
-#define UG_HOST		"ota.humminglab.io"
-#define UG_BASE		"/v2/devices/"DEVICE_TYPE"/"
-#define UG_BASE2	"/upgrade?type="DEVICE_TYPE"&version="
-
-#define START_MINUTES	60
-#define RANGE_MINUTES	240
-#define STEP_SEC	(10 * 60)
 
 #define MD5_LENGTH	16
 
@@ -37,23 +25,6 @@
 
 static const char ref[] = "HTTP/1.";
 static const char cl[] = "Content-Length:";
-static const char cm[] = "Content-MD5:";
-static const char xv[] = "X-CURR-VER:";
-
-struct a_url_t {
-	wiced_bool_t https;
-	uint16_t port;
-	const char *hostname;
-	const char *path;
-};
-
-static wiced_bool_t _get_hash(uint8_t *md5, const char* str)
-{
-	int i;
-	i = base64_decode((unsigned char*)str, (int32_t)strlen(str),
-			  md5, MD5_LENGTH+1, BASE64_STANDARD);
-	return (i != MD5_LENGTH) ? WICED_FALSE : WICED_TRUE;
-}
 
 static int _read_line(wiced_tcp_stream_t *stream, char *buf, int max)
 {
@@ -101,14 +72,13 @@ static void dump_bytes(const uint8_t* bptr, uint32_t len)
     printf("\n");
 }
 
-/* version 구분하여 download 조건 확인 */
-static ota_result_t _get_write_fw(int index, int max, wiced_bool_t use_https, const char* host, uint16_t port, const char* path)
+static ota_result_t _get_write_fw(int index, int max, wiced_bool_t use_https, const char* host, uint16_t port,
+				  const char* path, const uint8_t* md5)
 {
 	int i;
 	int len;
-	uint8_t md5[MD5_LENGTH+1];
 	uint8_t calc_md5[MD5_LENGTH+1];
-	wiced_bool_t md5_valid = WICED_FALSE;
+	uint8_t verify_md5[MD5_LENGTH+1];
 	md5_context md5_ctx;
 
 	uint32_t count  = 0;
@@ -119,7 +89,7 @@ static ota_result_t _get_write_fw(int index, int max, wiced_bool_t use_https, co
 	wiced_tcp_socket_t socket;
 	wiced_tls_context_t context;
 	wiced_tcp_stream_t stream;
-#define OTA_LIGHT_COUNT_INTERVAL 10
+
 	ota_result_t ota_result = OTA_FAILURE;
 
 	wiced_log_msg(WLF_DEF, WICED_LOG_INFO, "OTA server : %s \n", host);
@@ -176,20 +146,6 @@ static ota_result_t _get_write_fw(int index, int max, wiced_bool_t use_https, co
 	}
 	wiced_tcp_stream_write(&stream, host, strlen(host));
 	{
-		static const char s[] = "\r\nAuthorization: Bearer ";
-		wiced_tcp_stream_write(&stream, s, sizeof(s) - 1);
-	}
-#define _BSIZE (1024)
-	buf = malloc(_BSIZE);
-	{
-		app_dct_t* dct;
-		wiced_dct_read_lock((void**) &dct, WICED_FALSE, DCT_APP_SECTION,
-				    0, sizeof(app_dct_t));
-		len = (int)strlen(dct->device_token);
-		wiced_tcp_stream_write(&stream, dct->device_token, (uint32_t)len);
-		wiced_dct_read_unlock(dct, WICED_FALSE);
-	}
-	{
 		static const char s[] = "\r\nConnection: close\r\n\r\n";
 		wiced_tcp_stream_write(&stream, s, sizeof(s) - 1);
 	}
@@ -200,6 +156,8 @@ static ota_result_t _get_write_fw(int index, int max, wiced_bool_t use_https, co
 	}
 
 	/* read */
+#define _BSIZE (1024)
+	buf = malloc(_BSIZE);
 	i = _read_line(&stream, buf, _BSIZE);
 	if (i < 0 || strncmp(buf, ref, sizeof(ref) - 1) != 0) {
 		wiced_log_msg(WLF_DEF, WICED_LOG_ERR, "Bad HTTP response\n");
@@ -228,13 +186,7 @@ static ota_result_t _get_write_fw(int index, int max, wiced_bool_t use_https, co
 		if (strncasecmp(buf, cl, sizeof(cl) - 1) == 0) {
 			len = atoi(buf + (sizeof(cl) - 1));
 			wiced_log_msg(WLF_DEF, WICED_LOG_INFO, "Content-Length: %d\n", len);
-		} else if (strncasecmp(buf, cm, sizeof(cm) - 1) == 0) {
-			memset(md5, 0, sizeof(md5));
-			md5_valid = _get_hash(md5, buf + (sizeof(cm) - 1));
-			wiced_log_msg(WLF_DEF, WICED_LOG_INFO, "Content-MD5: %s\n", buf + (sizeof(cm) - 1));
-		} else if (strncasecmp(buf, xv, sizeof(xv) - 1) == 0) {
-			wiced_log_msg(WLF_DEF, WICED_LOG_INFO, "X-CURR-VER: %s\n", buf + (sizeof(xv) - 1));
- 		}
+		}
 	}
 	if (len <= 0 || len > max) {
 		wiced_log_msg(WLF_DEF, WICED_LOG_INFO, "Content-Length is over max_size: %d\n", max);
@@ -296,8 +248,8 @@ static ota_result_t _get_write_fw(int index, int max, wiced_bool_t use_https, co
 		wiced_tls_deinit_context(&context);
 	}
 
-	if (md5_valid) {
-		md5_finish(&md5_ctx, calc_md5);
+	md5_finish(&md5_ctx, calc_md5);
+	if (md5) {
 		if (memcmp(md5, calc_md5, MD5_LENGTH) != 0) {
 			wiced_log_msg(WLF_DEF, WICED_LOG_ERR, "Bad hash value: \n");
 			dump_bytes(calc_md5, MD5_LENGTH);
@@ -305,8 +257,6 @@ static ota_result_t _get_write_fw(int index, int max, wiced_bool_t use_https, co
 			goto return_error;
 		}
 		wiced_log_msg(WLF_DEF, WICED_LOG_INFO, "MD5 hash is verified\n");
-	} else {
-		md5_finish(&md5_ctx, md5);
 	}
 
 	/* Write verified */
@@ -320,8 +270,8 @@ static ota_result_t _get_write_fw(int index, int max, wiced_bool_t use_https, co
 	i = len % _BSIZE;
 	wiced_framework_app_read_chunk(&app, (uint32_t)(len/_BSIZE)*_BSIZE, (uint8_t*)buf, (uint32_t)i);
 	md5_update(&md5_ctx, (unsigned char*)buf, i);
-	md5_finish(&md5_ctx, calc_md5);
-	if (memcmp(md5, calc_md5, MD5_LENGTH) != 0) {
+	md5_finish(&md5_ctx, verify_md5);
+	if (memcmp(verify_md5, calc_md5, MD5_LENGTH) != 0) {
 		wiced_log_msg(WLF_DEF, WICED_LOG_ERR, "Bad hash value: \n");
 		dump_bytes(calc_md5, MD5_LENGTH);
 		ota_result = OTA_FAIL_MD5_VALIDATION_WRITING;
@@ -352,37 +302,57 @@ return_error:
 	return ota_result;
 }
 
-static void get_ota_request_endpoint(char * endpoint){
-	app_dct_t* dct;
-	wiced_dct_read_lock((void**) &dct, WICED_FALSE, DCT_APP_SECTION,
-				0, sizeof(app_dct_t));
-	sprintf(endpoint, "%s%s%s%s", UG_BASE, dct->device_id, UG_BASE2, a_fw_version());
-	wiced_dct_read_unlock(dct, WICED_FALSE);
+static int _atoh(char ch)
+{
+	if (ch >= '0' && ch <= '9')
+		return ch - '0';
+	else if (ch >= 'A' && ch <= 'F')
+		return ch - 'A' + 10;
+	else if (ch >= 'a' && ch <= 'f')
+		return ch - 'a' + 10;
+	else
+		return -1;
 }
 
-
-ota_result_t a_upgrade_from_shell(const char *host, uint16_t port)
+static wiced_result_t md5_hex_to_bin(const char* hex, uint8_t *bin)
 {
-	ota_result_t ota_result = OTA_FAILURE;
-	ota_result = _get_write_fw(DCT_FR_APP_INDEX, MAX_FIRMWARE_IMAGE_SIZE, WICED_FALSE, host,
-				   port, "/firmware.bin");
-	if (ota_result == OTA_SUCCESS)
-		wiced_framework_set_boot(DCT_FR_APP_INDEX, PLATFORM_DEFAULT_LOAD);
-	return (ota_result == OTA_SUCCESS) ? WICED_TRUE : WICED_FALSE;
+	int i;
+	i = strlen(hex);
+
+	memset(bin, 0, MD5_LENGTH);
+	if (i != MD5_LENGTH*2)
+		return WICED_ERROR;
+
+	for (i = 0; i < MD5_LENGTH; i++) {
+		int d1, d2;
+		d1 = _atoh(hex[i * 2]);
+		d2 = _atoh(hex[i * 2 + 1]);
+		if (d1 < 0 || d2 < 0)
+			return WICED_ERROR;
+
+		bin[i] = (uint8_t)((d1 << 4) + d2);
+	}
+	return WICED_SUCCESS;
 }
 
-ota_result_t a_upgrade_try(wiced_bool_t no_reboot)
+ota_result_t a_upgrade_try(wiced_bool_t use_tls, const char *host, uint16_t port,
+			   const char *path, const char *md5_hex, wiced_bool_t no_reboot)
 {
-	char ota_request_endpoint[128];
-	ota_result_t ota_result = OTA_FAILURE;
+	ota_result_t ota_result;
+	uint8_t md5_bin[MD5_LENGTH];
 
 	if (!a_network_is_up())
 		return WICED_FALSE;
 
-	get_ota_request_endpoint(ota_request_endpoint);
-	wiced_log_msg(WLF_DEF, WICED_LOG_INFO, "request endpoint : %s \n", ota_request_endpoint);
-	ota_result = _get_write_fw(DCT_FR_APP_INDEX, MAX_FIRMWARE_IMAGE_SIZE, UG_USE_HTTPS,
-				   UG_HOST, UG_PORT, ota_request_endpoint);
+	if (md5_hex) {
+		if (md5_hex_to_bin(md5_hex, md5_bin) < 0) {
+			wiced_log_msg(WLF_DEF, WICED_LOG_ERR, "Bad MD5 hexdigit format");
+			return WICED_FALSE;
+		}
+	}
+		
+	ota_result = _get_write_fw(DCT_FR_APP_INDEX, MAX_FIRMWARE_IMAGE_SIZE, use_tls,
+				   host, port, path, md5_hex ? md5_bin : NULL);
 	if (ota_result == OTA_SUCCESS) {
 		uint32_t ms = 3000;
 		wiced_log_msg(WLF_DEF, WICED_LOG_INFO, "Upgrade completed");
