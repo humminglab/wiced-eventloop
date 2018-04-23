@@ -5,6 +5,7 @@
  * of the MIT license.  See the LICENSE file for details.
  */
 #include "wiced.h"
+#include "gedday.h"
 #include "wiced_log.h"
 #include "platform_button.h"
 
@@ -18,6 +19,9 @@
 
 #define MQTT_MAX_TOPIC_SIZE	128
 #define MQTT_MAX_PAYLOAD_SIZE	512
+
+#define MDNS_SERVICE_MQTT        "_mqtt._tcp.local"
+#define MDNS_SERVICE_MQTTS        "_mqtts._tcp.local"
 
 static wiced_result_t mqtt_inner_event_loop(sys_mqtt_t *s, uint32_t event_type)
 {
@@ -96,7 +100,33 @@ static wiced_result_t mqtt_app_open(sys_mqtt_t *s)
 	wiced_mqtt_security_t security;
 	wiced_mqtt_pkt_connect_t conninfo;
 
+	memset(&security, 0, sizeof(security));
+	memset(&conninfo, 0, sizeof(conninfo));
+
 	wiced_log_msg(WLF_DEF, WICED_LOG_INFO, "Connecting MQTT\n");
+
+	if (!s->hostname) {
+		/* resolve address using mDNS */
+		gedday_service_t service_result;
+		res = gedday_init(WICED_STA_INTERFACE, "MQTT Discovery");
+		if (res != WICED_SUCCESS) {
+			wiced_log_msg(WLF_DEF, WICED_LOG_ERR, "Failed to init Gedday. Error [%d]\n", res);
+			return res;
+		}
+
+		res = gedday_discover_service(s->use_tls ? MDNS_SERVICE_MQTTS : MDNS_SERVICE_MQTT,
+					      &service_result);
+		if (res != WICED_SUCCESS) {
+			wiced_log_msg(WLF_DEF, WICED_LOG_ERR, "Failed to discover\n");
+			gedday_deinit();
+			return res;
+		}
+
+		conninfo.port_number = service_result.port;
+		s->hostname = service_result.hostname;
+		gedday_deinit();
+	}
+
 	res = wiced_hostname_lookup(s->hostname, &broker_address, 10000, WICED_STA_INTERFACE);
 	if (res != WICED_SUCCESS) {
 		wiced_log_msg(WLF_DEF, WICED_LOG_ERR, "Fail to get broker ip address of %s\n",
@@ -115,9 +145,6 @@ static wiced_result_t mqtt_app_open(sys_mqtt_t *s)
 	 *       If you want TlS, pass security pointer initialized to 0.
 	 *       If not, pass NULL pointer
 	 */
-	memset(&security, 0, sizeof(security));
-	memset(&conninfo, 0, sizeof(conninfo));
-	conninfo.port_number = 0;
 	conninfo.mqtt_version = WICED_MQTT_PROTOCOL_VER4;
 	conninfo.clean_session = 1;
 	conninfo.client_id = 0;
