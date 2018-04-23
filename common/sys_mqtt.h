@@ -18,10 +18,6 @@ typedef void (*mqtt_net_event_cb)(wiced_bool_t net, wiced_bool_t mqtt, void *arg
 #define A_EVENT_MQTT_SUBSCRIBED		(1 << 28)
 #define A_EVENT_MQTT_DISCONNECTED	(1 << 27)
 
-#define TOPIC_TELEMETRY "v1/devices/me/telemetry"
-#define TOPIC_ATTRIBUTES "v1/devices/me/attributes"
-#define TOPIC_SUBSCRIBE_RPC "v1/devices/me/rpc/request/+"
-
 typedef struct _sys_mqtt_t {
 	char mqtt_obj[WICED_MQTT_OBJECT_MEMORY_SIZE_REQUIREMENT];
 
@@ -34,8 +30,6 @@ typedef struct _sys_mqtt_t {
 	mqtt_net_event_cb net_event_cb;
 	void *arg;
 
-
-	eventloop_timer_node_t activity_timer_node;
 	eventloop_timer_node_t retry_timer_node;
 
 	eventloop_event_node_t net_event_node;
@@ -56,8 +50,6 @@ typedef struct _sys_mqtt_t {
 wiced_result_t a_sys_mqtt_init(sys_mqtt_t* s, eventloop_t *e, const char* hostname, wiced_bool_t use_tls,
 			       const char *user_token, const char *peer_cn, mqtt_subscribe_cb subscribe_cb,
 			       mqtt_net_event_cb net_event_cb, void *arg);
+wiced_result_t a_sys_mqtt_app_subscribe(sys_mqtt_t *s, char *topic, int qos);
 wiced_result_t a_sys_mqtt_publish(sys_mqtt_t *s, char *topic, char* data, uint32_t data_len, int qos,
 				  wiced_bool_t retain);
-
-wiced_bool_t a_sys_mqtt_is_rpc_topic(wiced_mqtt_topic_msg_t *msg);
-wiced_bool_t a_sys_mqtt_is_attribute_topic(wiced_mqtt_topic_msg_t *msg);

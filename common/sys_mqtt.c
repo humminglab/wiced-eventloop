@@ -16,8 +16,6 @@
 #define MQTT_RECONNECT_TIMEOUT	(5000U)
 #define MQTT_RECONNECT_RANDOM_WINDOW (5000U)
 
-#define ACTIVITY_INTERVAL	(10 * 1000)
-
 #define MQTT_MAX_TOPIC_SIZE	128
 #define MQTT_MAX_PAYLOAD_SIZE	512
 
@@ -127,12 +125,6 @@ static wiced_result_t mqtt_app_open(sys_mqtt_t *s)
 	conninfo.password = 0;
 	conninfo.username = (uint8_t*)s->user_token;
 	conninfo.peer_cn = (uint8_t*)s->peer_cn;
-
-	conninfo.will_qos = 0;
-	conninfo.will_retain = 0;
-	conninfo.will_topic = (uint8_t*)TOPIC_TELEMETRY;
-	conninfo.will_message = (uint8_t*)"{\"activity\":0}";
-
 	res = wiced_mqtt_connect(s->mqtt_obj, &broker_address, WICED_STA_INTERFACE,
 				 mqtt_connection_event_cb,
 				 (s->use_tls) ? &security : NULL, &conninfo);
@@ -156,7 +148,7 @@ static wiced_result_t mqtt_app_close(sys_mqtt_t *s)
 	return WICED_SUCCESS;
 }
 
-static wiced_result_t mqtt_app_subscribe(sys_mqtt_t *s, char *topic, int qos)
+wiced_result_t a_sys_mqtt_app_subscribe(sys_mqtt_t *s, char *topic, int qos)
 {
 	wiced_mqtt_msgid_t pktid;
 
@@ -167,30 +159,6 @@ static wiced_result_t mqtt_app_subscribe(sys_mqtt_t *s, char *topic, int qos)
 		return WICED_ERROR;
 	}
 	return mqtt_inner_event_loop(s, WICED_MQTT_EVENT_TYPE_SUBCRIBED);
-}
-
-extern const char * a_fw_version(void);
-extern const char * a_fw_model(void);
-
-static wiced_result_t mqtt_app_open_with_subscribe(sys_mqtt_t *s)
-{
-	wiced_result_t res;
-	char buf[128];
-
-	if ((res = mqtt_app_open(s)) != WICED_SUCCESS)
-		return res;
-
-	sprintf(buf, "{\"version\":\"%s\",\"model\":\"%s\"}", a_fw_version(), a_fw_model());
-	a_sys_mqtt_publish(s, TOPIC_ATTRIBUTES, buf, strlen(buf), 0, 0);
-	if (s->subscribe_cb) {
-		if (mqtt_app_subscribe(s, TOPIC_SUBSCRIBE_RPC, WICED_MQTT_QOS_DELIVER_AT_MOST_ONCE) != WICED_SUCCESS) {
-			goto _fail;
-		}
-	}
-	return WICED_SUCCESS;
- _fail:
-	mqtt_app_close(s);
-	return WICED_ERROR;
 }
 
 wiced_result_t a_sys_mqtt_publish(sys_mqtt_t *s, char *topic, char* data, uint32_t data_len, int qos, wiced_bool_t retain)
@@ -225,7 +193,7 @@ static void event_net_change(void *arg)
 			mqtt_app_close(s);
 		}
 
-		if (mqtt_app_open_with_subscribe(s) == WICED_SUCCESS) {
+		if (mqtt_app_open(s) == WICED_SUCCESS) {
 			s->mqtt_connected = WICED_TRUE;
 		} else {
 			uint32_t tout = MQTT_RECONNECT_TIMEOUT +
@@ -244,14 +212,6 @@ static void event_net_change(void *arg)
 
 	if (s->net_event_cb)
 		(*s->net_event_cb)(a_network_is_up(), s->mqtt_connected, s->arg);
-}
-
-static void activity_report_timer_fn(void *arg)
-{
-	sys_mqtt_t *s = arg;
-	char* payload = "{\"activity\":1}";
-	if (s->mqtt_connected && a_sys_mqtt_publish(s, TOPIC_TELEMETRY, payload, strlen(payload), 0, 0) != WICED_SUCCESS)
-		event_net_change(s); /* reconnect */
 }
 
 static wiced_result_t event_mqtt(sys_mqtt_t *s, wiced_mqtt_event_type_t type)
@@ -312,7 +272,6 @@ wiced_result_t a_sys_mqtt_init(sys_mqtt_t* s, eventloop_t *e, const char* hostna
 	a_network_register_callback(_net_event, s);
 	wiced_mqtt_init(s->mqtt_obj);
 
-	//a_eventloop_register_timer(s->evt, &s->activity_timer_node, activity_report_timer_fn, ACTIVITY_INTERVAL, s);
 	a_eventloop_register_event(s->evt, &s->net_event_node, event_net_change, A_EVENT_NET_CHANGE, s);
 	a_eventloop_register_event(s->evt, &s->mqtt_con_event_node, event_mqtt_connect_req, A_EVENT_MQTT_CONNECT_REQ, s);
 	a_eventloop_register_event(s->evt, &s->mqtt_pub_event_node, event_mqtt_published, A_EVENT_MQTT_PUBLISHED, s);
@@ -322,24 +281,4 @@ wiced_result_t a_sys_mqtt_init(sys_mqtt_t* s, eventloop_t *e, const char* hostna
 	if (a_network_is_up())
 		a_eventloop_set_flag(s->evt, A_EVENT_NET_CHANGE);
 	return WICED_SUCCESS;
-}
-
-wiced_bool_t a_sys_mqtt_is_rpc_topic(wiced_mqtt_topic_msg_t *msg)
-{
-	uint32_t cmp_size = strlen(TOPIC_SUBSCRIBE_RPC) - 1;
-	if (msg && msg->topic && msg->topic_len > cmp_size && msg->data && msg->data_len > 0 &&
-	    strncmp((char*)msg->topic, TOPIC_SUBSCRIBE_RPC, cmp_size) == 0)
-		return WICED_TRUE;
-	else
-		return WICED_FALSE;
-}
-
-wiced_bool_t a_sys_mqtt_is_attribute_topic(wiced_mqtt_topic_msg_t *msg)
-{
-	uint32_t cmp_size = strlen(TOPIC_ATTRIBUTES);
-	if (msg && msg->topic && msg->topic_len > cmp_size && msg->data && msg->data_len > 0 &&
-	    strncmp((char*)msg->topic, TOPIC_ATTRIBUTES, cmp_size) == 0)
-		return WICED_TRUE;
-	else
-		return WICED_FALSE;
 }
