@@ -8,7 +8,7 @@
 #endif
 
 #ifdef DEBUG
-#define debug_print_assert(A,B,C,D,E,F, ...) fprintf(stderr, "[%s:%s:%4d] **ASSERT** %s""\r\n", D ? D : "", F, E, C ? C : "", ##__VA_ARGS__)
+#define debug_print_assert(A,B,C,D,E,F, ...) wiced_log_msg(WLF_DEF, WICED_LOG_ERR, "[%s:%s:%4d] **ASSERT** %s""\r\n", D ? D : "", F, E, C ? C : "", ##__VA_ARGS__)
 #else
 #define debug_print_assert(A,B,C,D,E,F, ...)
 #endif
