@@ -9,6 +9,7 @@
 int cmd_get_dct(int argc, char* argv[]);
 int cmd_set_server(int argc, char* argv[]);
 int cmd_set_device_token(int argc, char* argv[]);
+int cmd_set_device_id(int argc, char* argv[]);
 int cmd_set_wlan(int argc, char* argv[]);
 int cmd_set_mac(int argc, char* argv[]);
 int cmd_get_mac(int argc, char* argv[]);
@@ -21,6 +22,7 @@ int cmd_adc(int argc, char* argv[]);
  { "get_dct", cmd_get_dct, 0, NULL, NULL, NULL, "Get DCT information" }, \
  { "set_server", cmd_set_server, 1, NULL, NULL, "server_address", "Set Server Address" }, \
  { "set_device_token", cmd_set_device_token, 1, NULL, NULL, "device_token", "Set Device Token" }, \
+ { "set_device_id", cmd_set_device_id, 1, NULL, NULL, "device_id", "Set Device ID" }, \
  { "set_wlan", cmd_set_wlan, 3, NULL, NULL, "ssid security, key", "Set AP info" }, \
  { "set_mac", cmd_set_mac, 1, NULL, NULL, "mac", "Set MAC address" }, \
  { "get_mac", cmd_get_mac, 0, NULL, NULL, NULL, "Get MAC address" }, \

@@ -11,4 +11,5 @@ DEFINE_APP_DCT(app_dct_t)
 {
 	.server		= "",
 	.device_token   = "",
+	.device_id      = "",
 };

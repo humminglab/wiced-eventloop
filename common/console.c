@@ -25,6 +25,7 @@ int cmd_get_dct(int argc, char* argv[])
 			     0, sizeof(app_dct_t));
 	WPRINT_APP_INFO(("Server: %s\n", dct->server));
 	WPRINT_APP_INFO(("Device Token: %s\n", dct->device_token));
+	WPRINT_APP_INFO(("Device ID: %s\n", dct->device_id));
 	wiced_dct_read_unlock(dct, WICED_FALSE);
 
 	wiced_dct_read_lock((void**)&dct_wifi_config, WICED_FALSE, DCT_WIFI_CONFIG_SECTION,
@@ -68,6 +69,22 @@ int cmd_set_device_token(int argc, char* argv[])
 	wiced_dct_read_unlock(dct, WICED_TRUE);
 	return ERR_CMD_OK;
 }	
+
+int cmd_set_device_id(int argc, char* argv[])
+{
+	app_dct_t* dct;
+	if (argc < 2)
+		return ERR_INSUFFICENT_ARGS;
+
+	wiced_dct_read_lock((void**) &dct, WICED_TRUE, DCT_APP_SECTION,
+			     0, sizeof(app_dct_t));
+	memset(dct->device_id, 0, sizeof(dct->device_token));
+	strcpy(dct->device_id, argv[1]);
+	wiced_dct_write((const void*)dct, DCT_APP_SECTION,
+			0, sizeof(app_dct_t));
+	wiced_dct_read_unlock(dct, WICED_TRUE);
+	return ERR_CMD_OK;
+}
 
 int cmd_set_wlan(int argc, char* argv[])
 {
