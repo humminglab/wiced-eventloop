@@ -18,7 +18,7 @@ int cmd_rssi(int argc, char* argv[]);
 int cmd_pwm(int argc, char* argv[]);
 int cmd_adc(int argc, char* argv[]);
 
-#define BUS_SHELTER_COMMANDS \
+#define EVENTLOOP_COMMANDS \
  { "get_dct", cmd_get_dct, 0, NULL, NULL, NULL, "Get DCT information" }, \
  { "set_server", cmd_set_server, 1, NULL, NULL, "server_address", "Set Server Address" }, \
  { "set_device_token", cmd_set_device_token, 1, NULL, NULL, "device_token", "Set Device Token" }, \
