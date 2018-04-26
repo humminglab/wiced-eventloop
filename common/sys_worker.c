@@ -42,6 +42,16 @@ wiced_result_t a_sys_worker_trigger(sys_worker_t *s)
 	return WICED_SUCCESS;
 }
 
+wiced_result_t a_sys_worker_change_inteval(sys_worker_t *s, int interval_ms)
+{
+	s->interval_ms = interval_ms;
+	if (a_eventloop_get_timer_fn(s->evt, &s->timer_node)) {
+		a_eventloop_deregister_timer(s->evt, &s->timer_node);
+		a_eventloop_register_timer(s->evt, &s->timer_node, timer_callback, s->interval_ms, s);
+	}
+	return WICED_SUCCESS;
+}
+
 wiced_result_t a_sys_worker_init(sys_worker_t *s, wiced_worker_thread_t* worker_thread,
 				 eventloop_t *e, uint32_t event_flag, int interval_ms,
 				 sys_worker_fn worker_fn, sys_worker_fn finish_fn, void *arg)
