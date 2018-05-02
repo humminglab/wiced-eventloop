@@ -13,6 +13,7 @@
 #include "app_dct.h"
 #include "util.h"
 #include "device.h"
+#include "upgrade.h"
 
 int cmd_get_dct(int argc, char* argv[])
 {
@@ -205,5 +206,37 @@ int cmd_adc(int argc, char* argv[])
 		wiced_adc_take_sample(WICED_PWM_1+i, &v);
 		printf("ADC %d: %d\n", i, (int)v);
 	}
+	return ERR_CMD_OK;
+}
+
+static wiced_result_t upgrade_worker(void * arg)
+{
+	ushort port;
+	char **argv = arg;
+	wiced_semaphore_t *sem = (wiced_semaphore_t*)argv[0];
+
+	port = atoi(argv[2]);
+
+	a_upgrade_try(WICED_FALSE, argv[1], port, argv[3], NULL, WICED_FALSE);
+	wiced_rtos_set_semaphore(sem);
+	return WICED_SUCCESS;
+}
+
+int cmd_upgrade(int argc, char* argv[])
+{
+	wiced_worker_thread_t worker_thread;
+	wiced_semaphore_t sem;
+
+	if (argc < 4)
+		return ERR_INSUFFICENT_ARGS;
+
+	argv[0] = (char*)&sem;
+	wiced_rtos_init_semaphore(&sem);
+	wiced_rtos_create_worker_thread(&worker_thread, WICED_DEFAULT_WORKER_PRIORITY, 8192, 1);
+	wiced_rtos_send_asynchronous_event(&worker_thread, upgrade_worker, argv);
+	wiced_rtos_get_semaphore(&sem, WICED_WAIT_FOREVER);
+
+	wiced_rtos_delete_worker_thread(&worker_thread);
+	wiced_rtos_deinit_semaphore(&sem);
 	return ERR_CMD_OK;
 }

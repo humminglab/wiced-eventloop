@@ -17,6 +17,7 @@ int cmd_reboot(int argc, char* argv[]);
 int cmd_rssi(int argc, char* argv[]);
 int cmd_pwm(int argc, char* argv[]);
 int cmd_adc(int argc, char* argv[]);
+int cmd_upgrade(int argc, char* argv[]);
 
 #define EVENTLOOP_COMMANDS \
  { "get_dct", cmd_get_dct, 0, NULL, NULL, NULL, "Get DCT information" }, \
@@ -29,4 +30,5 @@ int cmd_adc(int argc, char* argv[]);
  { "reboot", cmd_reboot, 0, NULL, NULL, NULL, "Reboot" }, \
  { "rssi", cmd_rssi, 0, NULL, NULL, NULL, "Get RSSI" }, \
  { "pwm", cmd_pwm, 2, NULL, NULL, "index level (freq)", "Set PWM" }, \
- { "adc", cmd_adc, 0, NULL, NULL, NULL, "Read all ADC" },
+ { "adc", cmd_adc, 0, NULL, NULL, NULL, "Read all ADC" },\
+ { "upgrade", cmd_upgrade, 3, NULL, NULL, NULL, "hostname port path", "Upgrade FW" },
