@@ -21,7 +21,7 @@
 
 #define NET_TIMEOUT	60000
 
-#define MAX_FIRMWARE_IMAGE_SIZE 400 * 1024
+#define MAX_FIRMWARE_IMAGE_SIZE 500 * 1024
 
 static const char ref[] = "HTTP/1.";
 static const char cl[] = "Content-Length:";
