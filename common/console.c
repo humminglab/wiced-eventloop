@@ -48,7 +48,8 @@ int cmd_set_server(int argc, char* argv[])
 	wiced_dct_read_lock((void**) &dct, WICED_TRUE, DCT_APP_SECTION,
 			     0, sizeof(app_dct_t));
 	memset(dct->server, 0, sizeof(dct->server));
-	strcpy(dct->server, argv[1]);
+	if (!(strlen(argv[1]) == 1 && argv[1][0] == '-'))
+		strcpy(dct->server, argv[1]);
 	wiced_dct_write((const void*)dct, DCT_APP_SECTION,
 			0, sizeof(app_dct_t));
 	wiced_dct_read_unlock(dct, WICED_TRUE);
@@ -64,7 +65,8 @@ int cmd_set_device_token(int argc, char* argv[])
 	wiced_dct_read_lock((void**) &dct, WICED_TRUE, DCT_APP_SECTION,
 			     0, sizeof(app_dct_t));
 	memset(dct->device_token, 0, sizeof(dct->device_token));
-	strcpy(dct->device_token, argv[1]);
+	if (!(strlen(argv[1]) == 1 && argv[1][0] == '-'))
+		strcpy(dct->device_token, argv[1]);
 	wiced_dct_write((const void*)dct, DCT_APP_SECTION,
 			0, sizeof(app_dct_t));
 	wiced_dct_read_unlock(dct, WICED_TRUE);
@@ -80,7 +82,8 @@ int cmd_set_device_id(int argc, char* argv[])
 	wiced_dct_read_lock((void**) &dct, WICED_TRUE, DCT_APP_SECTION,
 			     0, sizeof(app_dct_t));
 	memset(dct->device_id, 0, sizeof(dct->device_token));
-	strcpy(dct->device_id, argv[1]);
+	if (!(strlen(argv[1]) == 1 && argv[1][0] == '-'))
+		strcpy(dct->device_id, argv[1]);
 	wiced_dct_write((const void*)dct, DCT_APP_SECTION,
 			0, sizeof(app_dct_t));
 	wiced_dct_read_unlock(dct, WICED_TRUE);
