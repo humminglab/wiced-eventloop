@@ -5,6 +5,7 @@
  * of the MIT license.  See the LICENSE file for details.
  */
 #include "wiced.h"
+#include "wiced_crypto.h"
 
 #include "app_dct.h"
 #include "util.h"
@@ -112,4 +113,22 @@ void a_stack_check(void)
 	printf("  Used: %u/%u (%f%%)\n", (unsigned int)used,
 	       (unsigned int)pt->tx_thread_stack_size,
 	       (double)used / pt->tx_thread_stack_size * 100.);
+}
+
+void a_init_srand(void)
+{
+	unsigned int seed;
+	wiced_crypto_get_random(&seed, sizeof(seed));
+	srand(seed);
+}
+
+uint32_t a_random_time_window(uint32_t max_ms)
+{
+	int x = rand();
+
+	if (max_ms == 0)
+		return 0;
+
+	x %= (max_ms - 1);
+	return x + 1;
 }

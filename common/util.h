@@ -15,3 +15,6 @@ wiced_result_t a_set_wlan(char *ssid, char *security, char *key);
 void a_stack_check(void);
 
 const char * a_fw_version(void);
+
+void a_init_srand(void);
+uint32_t a_random_time_window(uint32_t max_ms);
