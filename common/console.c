@@ -103,6 +103,8 @@ static inline unsigned int hextoint(char c)
 {
 	if (c >= '0' && c <= '9')
 		return (unsigned int)c - '0';
+	else if (c >= 'A' && c <= 'F')
+		return (unsigned int)c - 'A' + 10;
 	else
 		return (unsigned int)c - 'a' + 10;
 }
